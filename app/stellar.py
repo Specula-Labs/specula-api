@@ -53,10 +53,13 @@ def score_account(address: str, settings: Settings | None = None) -> dict:
     for op in records:
         try:
             created = datetime.fromisoformat(op["created_at"].replace("Z", "+00:00"))
-        except (KeyError, ValueError):
+            if created < window_start:
+                continue
+        except (KeyError, ValueError, TypeError):
+            # A timestamp without a timezone offset cannot be compared with the
+            # timezone-aware window boundary; skip the record instead of raising.
             continue
-        if created >= window_start:
-            recent.append(op)
+        recent.append(op)
 
     counterparties: set[str] = set()
     volume = 0.0
