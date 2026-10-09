@@ -85,3 +85,27 @@ def test_events_cursor_skips_health_and_reuses_cursor(monkeypatch):
     stellar.list_flag_events(10, cursor="opaque-cursor", settings=settings)
     assert captured["pagination"]["cursor"] == "opaque-cursor"
     assert "startLedger" not in captured
+
+
+def test_score_skips_naive_timestamp_records(monkeypatch):
+    naive = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+    aware = datetime.now(timezone.utc).isoformat()
+    records = [
+        {"created_at": naive, "type": "payment", "source_account": ADDRESS, "to": "G" + "B" * 55,
+         "asset_type": "native", "amount": "5"},
+        {"created_at": aware, "type": "payment", "source_account": ADDRESS, "to": "G" + "B" * 55,
+         "asset_type": "native", "amount": "5"},
+    ]
+
+    def fake_get(url, params=None, settings=None):
+        if url.endswith("/accounts/" + ADDRESS):
+            return {"sequence": "10", "balances": [{"asset_type": "native", "balance": "500"}]}
+        return {"_embedded": {"records": records}}
+
+    monkeypatch.setattr(stellar, "_get", fake_get)
+    response = client.post("/risk/score", json={"address": ADDRESS})
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["metrics"]["operations_scanned"] == 2
+    assert payload["metrics"]["operations_in_window"] == 1
+    assert payload["metrics"]["transfers_in_window"] == 1
