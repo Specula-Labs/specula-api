@@ -67,6 +67,10 @@ def score_account(address: str, settings: Settings | None = None) -> dict:
             # timezone-aware window boundary; skip the record instead of raising.
             continue
         recent.append(op)
+            if created >= window_start:
+                recent.append(op)
+        except (KeyError, TypeError, ValueError):
+            continue
 
     counterparties: set[str] = set()
     volume = 0.0
