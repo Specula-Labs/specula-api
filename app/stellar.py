@@ -1,5 +1,6 @@
 """Read-only clients for Horizon and Stellar RPC."""
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 import base64
 
 import httpx
@@ -8,10 +9,16 @@ from fastapi import HTTPException
 from app.config import Settings, get_settings
 
 
+@lru_cache
+def _http_client(timeout_seconds: float) -> httpx.Client:
+    """Return a process-wide HTTP client so connection pools are reused."""
+    return httpx.Client(timeout=timeout_seconds)
+
+
 def _get(url: str, params: dict | None = None, settings: Settings | None = None) -> dict:
     settings = settings or get_settings()
     try:
-        response = httpx.get(url, params=params, timeout=settings.request_timeout_seconds)
+        response = _http_client(settings.request_timeout_seconds).get(url, params=params)
         response.raise_for_status()
         return response.json()
     except httpx.HTTPStatusError as exc:
@@ -25,10 +32,9 @@ def _get(url: str, params: dict | None = None, settings: Settings | None = None)
 def _rpc(method: str, params: dict, settings: Settings | None = None) -> dict:
     settings = settings or get_settings()
     try:
-        response = httpx.post(
+        response = _http_client(settings.request_timeout_seconds).post(
             settings.soroban_rpc_url,
             json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
-            timeout=settings.request_timeout_seconds,
         )
         response.raise_for_status()
         payload = response.json()
