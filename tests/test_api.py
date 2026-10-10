@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
@@ -33,6 +33,37 @@ def test_score_uses_horizon_data_and_returns_bounded_explainable_signals(monkeyp
     assert payload["metrics"]["transfer_volume_xlm"] == 12000
     assert payload["signals"][0]["source"] == "Stellar Horizon account operations"
     assert client.post("/risk/score", json={"address": ADDRESS, "recent_tx_count": 10}).status_code == 422
+
+
+def test_score_skips_naive_timestamps_and_preserves_valid_metrics(monkeypatch):
+    now = datetime.now(timezone.utc)
+    records = [
+        {"created_at": now.replace(tzinfo=None).isoformat(), "type": "payment",
+         "source_account": ADDRESS, "to": "G" + "C" * 55, "asset_type": "native", "amount": "12000"},
+        {"created_at": now.isoformat().replace("+00:00", "Z"), "type": "payment",
+         "source_account": ADDRESS, "to": "G" + "B" * 55, "asset_type": "native", "amount": "10"},
+        {"created_at": now.astimezone(timezone(timedelta(hours=5, minutes=30))).isoformat(), "type": "payment",
+         "source_account": ADDRESS, "to": "G" + "B" * 55, "asset_type": "native", "amount": "20"},
+        {"created_at": (now - timedelta(days=30)).isoformat(), "type": "payment",
+         "source_account": ADDRESS, "to": "G" + "D" * 55, "asset_type": "native", "amount": "20000"},
+    ]
+    def fake_get(url, params=None, settings=None):
+        if url.endswith("/accounts/" + ADDRESS):
+            return {"sequence": "10", "balances": [{"asset_type": "native", "balance": "500"}]}
+        return {"_embedded": {"records": records}}
+    monkeypatch.setattr(stellar, "_get", fake_get)
+    response = client.post("/risk/score", json={"address": ADDRESS})
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["metrics"]["operations_scanned"] == 4
+    assert payload["metrics"]["operations_in_window"] == 2
+    assert payload["metrics"]["transfers_in_window"] == 2
+    assert payload["metrics"]["transfer_volume_xlm"] == 30
+    assert payload["metrics"]["distinct_counterparties"] == 1
+    assert payload["metrics"]["account_sequence"] == 10
+    assert payload["metrics"]["native_xlm_balance"] == 500
+    assert payload["score"] == 0
+    assert payload["signals"] == []
 
 
 def test_events_requires_contract_id():

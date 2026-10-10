@@ -123,6 +123,8 @@ Do not commit `.env`, account secrets, signing keys, or tokens. The current serv
 
 The score uses a bounded sample of recent Horizon operations, up to 200, and fixed baseline thresholds. It is not a trained model. RPC event history is provider-limited and is not a complete archive. Configure a persistent indexer for long-term event history.
 
+Operations with timestamps that lack timezone information are skipped when applying the activity window.
+
 ## Security Notes
 
 - **Read-only and keyless.** The service holds no signing keys and submits no transactions; every Stellar call is a read through Horizon or RPC.
