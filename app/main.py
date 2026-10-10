@@ -7,7 +7,7 @@ from app.routers import health, events, risk
 settings = get_settings()
 
 app = FastAPI(
-    title="Stellar Sentinel API",
+    title="Specula API",
     description="Read-only Stellar account screening and Soroban contract event API.",
     version="0.1.0",
 )
