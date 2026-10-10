@@ -2,6 +2,7 @@
 from datetime import datetime, timedelta, timezone
 from functools import lru_cache
 import base64
+from datetime import datetime, timedelta, timezone
 
 import httpx
 from fastapi import HTTPException
@@ -172,14 +173,15 @@ def list_flag_events(limit: int, cursor: str | None = None, settings: Settings |
     settings = settings or get_settings()
     if not settings.contract_id:
         raise HTTPException(status_code=503, detail="CONTRACT_ID is required to read Stellar Sentinel on-chain events")
-    params = {
+    pagination: dict[str, object] = {"limit": limit}
+    params: dict[str, object] = {
         "filters": [{"type": "contract", "contractIds": [settings.contract_id],
                      "topics": [[_symbol_scval("flagged"), "*", "*", "**"]]}],
-        "pagination": {"limit": limit},
+        "pagination": pagination,
         "xdrFormat": "json",
     }
     if cursor:
-        params["pagination"]["cursor"] = cursor
+        pagination["cursor"] = cursor
     else:
         health = _rpc("getHealth", {}, settings)
         latest = int(health.get("latestLedger", 1))

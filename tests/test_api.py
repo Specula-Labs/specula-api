@@ -1,7 +1,7 @@
 from datetime import datetime, timezone
 
-from fastapi.testclient import TestClient
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
 from app import stellar
 from app.config import Settings

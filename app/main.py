@@ -1,8 +1,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
 from app.config import get_settings
+from app.routers import events, health, risk
 from app.stellar import network_status
-from app.routers import health, events, risk
 
 settings = get_settings()
 
